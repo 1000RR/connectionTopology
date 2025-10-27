@@ -1,7 +1,7 @@
 import csv
 import re
 import sys
-from typing import List, Tuple, Dict, Set, Iterable
+from typing import List, Tuple, Dict, Set, Iterable, Optional
 
 # --- ANSI Color Codes ---
 COLORS: List[str] = [
@@ -35,6 +35,8 @@ ISOLATED_PIN_COLOR: str = "\033[44m"           # Blue background for the P pins
 
 # Global list for dynamically loaded prefixes (e.g., ['A', 'B'])
 GRID_PREFIXES: List[str] = []
+# Grid prefixes sorted by length (longest first) for reliable prefix matching
+GRID_PREFIXES_BY_LENGTH: List[str] = []
 # Global dictionary to store prefix-specific dimensions: {'A': (3, 4), 'B': (5, 4), ...}
 GRID_DIMENSIONS: Dict[str, Tuple[int, int]] = {}
 # The width of a single cell in the ASCII chart (used for padding)
@@ -67,22 +69,48 @@ def get_non_comment_lines(file_path: str) -> List[str]:
 # --- Core Helper Functions ---
 
 def is_grid_definition(item: str) -> bool:
-    """Checks if an item is formatted like a grid definition (X:CxR), case-insensitive."""
-    return bool(re.match(r'^[A-Z]:\d+x\d+$', item.strip(), re.IGNORECASE))
+    """Checks if an item is formatted like a grid definition (PREFIX:CxR), case-insensitive."""
+    return bool(re.match(r'^[A-Z][A-Z0-9]*:\d+x\d+$', item.strip(), re.IGNORECASE))
 
 def is_e2e_pin_definition(item: str) -> bool:
     """Checks if an item is formatted like an e2epins definition."""
     return item.strip().lower().startswith('e2epins:')
 
+def split_pin_name(pin: str) -> Optional[Tuple[str, int]]:
+    """
+    Attempts to split a pin name into its grid prefix and numeric index.
+    Prefers known prefixes (including those with embedded digits) and falls back to a generic pattern.
+    """
+    prefixes = GRID_PREFIXES_BY_LENGTH if GRID_PREFIXES_BY_LENGTH else sorted(GRID_PREFIXES, key=len, reverse=True)
+    for prefix in prefixes:
+        if pin.startswith(prefix):
+            suffix = pin[len(prefix):]
+            if suffix.isdigit() and suffix:
+                return prefix, int(suffix)
+
+    match = re.match(r'^([A-Za-z][A-Za-z0-9]*)(\d+)$', pin)
+    if match:
+        prefix_part = match.group(1)
+        index_part = int(match.group(2))
+        return prefix_part.upper(), index_part
+    return None
+
 def is_pin(item: str) -> bool:
-    """Checks if an item is a switch pin (X<num>) where X is a recognized prefix."""
-    if not GRID_PREFIXES:
-        return bool(re.match(r'^[A-Z]\d+$', item)) 
-        
-    match = re.match(r'^([A-Z])(\d+)$', item)
-    if match and match.group(1) in GRID_PREFIXES:
-        return True
-    return False
+    """Checks if an item is a switch pin where the prefix is a recognized grid identifier."""
+    split_result = split_pin_name(item)
+    if not split_result:
+        return False
+    prefix, _ = split_result
+    if GRID_PREFIXES and prefix not in GRID_PREFIXES:
+        return False
+    return True
+
+def pin_sort_key(pin: str) -> Tuple[str, int]:
+    """Sorting helper that groups by prefix and then by numeric index."""
+    split_result = split_pin_name(pin)
+    if split_result:
+        return split_result
+    return (pin, sys.maxsize)
 
 def is_p_element(item: str) -> bool:
     """
@@ -104,7 +132,7 @@ def load_all_configs(file_path: str) -> Tuple[int, int, List[str]]:
     max_C: int = 3
     max_R: int = 4
     
-    global GRID_DIMENSIONS, E2E_PINS
+    global GRID_DIMENSIONS, E2E_PINS, GRID_PREFIXES_BY_LENGTH
     GRID_DIMENSIONS = {}
     E2E_PINS = []
     
@@ -115,7 +143,7 @@ def load_all_configs(file_path: str) -> Tuple[int, int, List[str]]:
             line_stripped = line.strip()
             
             # --- Grid Definitions ---
-            matches = re.findall(r'([A-Z]):(\d+)x(\d+)', line_stripped, re.IGNORECASE)
+            matches = re.findall(r'([A-Z][A-Z0-9]*):(\d+)x(\d+)', line_stripped, re.IGNORECASE)
             for prefix, c_str, r_str in matches:
                 prefix_upper = prefix.upper()
                 C_val = int(c_str)
@@ -144,6 +172,7 @@ def load_all_configs(file_path: str) -> Tuple[int, int, List[str]]:
         
     global GRID_PREFIXES 
     GRID_PREFIXES = sorted(list(prefixes))
+    GRID_PREFIXES_BY_LENGTH = sorted(GRID_PREFIXES, key=len, reverse=True)
     
     # If E2E pins weren't defined, default to 'G' and 'T' for backward compatibility
     if not E2E_PINS:
@@ -195,14 +224,14 @@ def load_state_data_as_groups(file_path: str, prefix: str) -> List[List[str]]:
                     
                     if part.isdigit():
                         group.add(prefix + part)
-                    elif re.match(r'^([A-Z])(\d+)$', part) and part.startswith(prefix):
-                         group.add(part)
+                    elif is_pin(part_upper) and part_upper.startswith(prefix):
+                         group.add(part_upper)
                     # Include P-elements AND E2E pins (now dynamically loaded)
                     elif is_p_element(part_upper) or (part_upper in E2E_PINS): 
                          group.add(part_upper)
                          
             if group:
-                pins = sorted([item for item in group if is_pin(item)], key=lambda x: int(x[1:]))
+                pins = sorted([item for item in group if is_pin(item)], key=pin_sort_key)
                 
                 external = sorted([item for item in group if not is_pin(item) and not is_grid_definition(item) and not is_e2e_pin_definition(item)], key=str.upper)
                 
@@ -231,7 +260,7 @@ def load_state_pin_set(file_path: str, prefix: str) -> set:
                 
                 if part.isdigit():
                     state_pins.add(prefix + part)
-                elif re.match(r'^([A-Z])(\d+)$', part) and part.startswith(prefix):
+                elif is_pin(part) and part.startswith(prefix):
                      state_pins.add(part)
 
     return state_pins
@@ -258,7 +287,7 @@ def reduce_connection_groups(initial_groups: List[List[str]]) -> List[List[str]]
 
     final_reduced_groups: List[List[str]] = []
     for group_set in merged_groups:
-        pins = sorted([item for item in group_set if is_pin(item)], key=lambda x: (x[0], int(x[1:])))
+        pins = sorted([item for item in group_set if is_pin(item)], key=pin_sort_key)
         
         # Sort external items alphabetically (case-insensitive)
         external = sorted([item for item in group_set if not is_pin(item) and not is_grid_definition(item) and not is_e2e_pin_definition(item)], key=str.upper)
@@ -359,7 +388,10 @@ def calculate_global_colors(globally_reduced_groups: List[List[str]], map_coords
                     all_unique_external_items.add(item) 
 
     for item, color in pin_color_map.items():
-        prefix = item[0]
+        split_result = split_pin_name(item)
+        if not split_result:
+            continue
+        prefix, _ = split_result
         if prefix in map_coords:
             current_map: Dict[str, Tuple[int, int]] = map_coords[prefix]
             state_pins: Set[str] = state_pins_by_prefix.get(prefix, set())
@@ -467,7 +499,7 @@ def process_and_output_charts(data_file: str, state_file_bases: List[str]) -> No
     Main function to load all data, perform global reduction, print results,
     output individual charts, and output consolidated charts for N grids.
     """
-    global GRID_PREFIXES, GRID_DIMENSIONS, GLOBAL_CELL_WIDTH, GRID_SEPARATOR, E2E_PINS
+    global GRID_PREFIXES, GRID_DIMENSIONS, GLOBAL_CELL_WIDTH, GRID_SEPARATOR, E2E_PINS, GRID_PREFIXES_BY_LENGTH
     
     # 1. LOAD CONFIGS AND DETERMINE MAX DIMENSIONS
     # E2E_PINS are loaded here
@@ -582,15 +614,23 @@ def process_and_output_charts(data_file: str, state_file_bases: List[str]) -> No
 
         for item in line_data:
             if is_pin(item):
-                prefix = item[0]
-                current_map: Dict[str, Tuple[int, int]] = map_coords[prefix]
-                state_pins: set = state_pins_by_prefix.get(prefix, set())
+                split_result = split_pin_name(item)
+                if not split_result:
+                    continue
+                prefix, _ = split_result
+                current_map = map_coords.get(prefix)
+                if not current_map:
+                    continue
+
+                state_pins: Set[str] = state_pins_by_prefix.get(prefix, set())
 
                 if item in current_map:
                     r, c_end = current_map[item]
                     c_start = c_end - cell_width
                     text_format_code: str = TEXT_BOLD_ITALIC_STATE if item in state_pins else ""
-                    ops_list: List[Tuple[int, int, str]] = color_ops_by_prefix[prefix]
+                    ops_list = color_ops_by_prefix.get(prefix)
+                    if ops_list is None:
+                        continue
                     ops_list.append((r, c_end, PIN_TERMINATOR))
                     ops_list.append((r, c_start, color + text_format_code))
 
@@ -707,7 +747,10 @@ def process_and_output_charts(data_file: str, state_file_bases: List[str]) -> No
                             all_unique_external_items.add(item) 
 
             for item, color in pin_color_map.items():
-                prefix = item[0]
+                split_result = split_pin_name(item)
+                if not split_result:
+                    continue
+                prefix, _ = split_result
                 if prefix in pin_coords_map:
                     current_map: Dict[str, Tuple[int, int]] = pin_coords_map[prefix]
                     state_pins: Set[str] = state_pins_map.get(prefix, set())
