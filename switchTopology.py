@@ -293,7 +293,7 @@ def generate_ascii_grid(prefix: str, C: int, R: int, cell_width: int) -> Tuple[L
     grid_lines.append(border_line)
     for i in range(R):
         row_str: str = "|"
-        for j in range(C):
+        for _ in range(C):
             cell_name: str = prefix + str(dot_number)
             line_index: int = 2 * i + 1
             closing_pipe_index: int = len(row_str) + cell_width
@@ -545,7 +545,7 @@ def process_and_output_charts(data_file: str, state_file_bases: List[str]) -> No
 
 
     # 6. Part 3 / Part 4 calculation using the new priority logic
-    pin_color_map_part3, external_color_map_part3, consolidated_pin_ops_part3, all_unique_external_items_part3 = \
+    _pin_color_map_part3, external_color_map_part3, consolidated_pin_ops_part3, all_unique_external_items_part3 = \
         calculate_global_colors(globally_reduced_groups, map_coords, state_pins_by_prefix, cell_width)
 
     # --- Initializing Part 2 variables ---
@@ -563,7 +563,6 @@ def process_and_output_charts(data_file: str, state_file_bases: List[str]) -> No
     color_index: int = 0
     
     # Prepare header template for individual charts
-    num_grids = len(GRID_PREFIXES)
     header_parts = [f"GROUP {p}" for p in GRID_PREFIXES]
     header_str_template = GRID_SEPARATOR.join(header_parts)
     
@@ -723,7 +722,7 @@ def process_and_output_charts(data_file: str, state_file_bases: List[str]) -> No
                         
             return pin_color_map, external_color_map, consolidated_pin_ops, all_unique_external_items
 
-        pin_color_map_part2_5, external_color_map_part2_5, consolidated_pin_ops_part2_5, all_unique_external_items_part2_5 = \
+        _pin_color_map_part2_5, external_color_map_part2_5, consolidated_pin_ops_part2_5, all_unique_external_items_part2_5 = \
             calculate_state_only_colors(state_only_reduced_groups, map_coords, state_pins_by_prefix, cell_width)
 
         # 3. Generate the Chart
