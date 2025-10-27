@@ -23,6 +23,14 @@ COLORS: List[str] = [
     "\033[48;5;202m", # Deep Orange
     "\033[48;5;36m",  # Dark Cyan
 ]
+GROUP_SUMMARY_COLORS: List[str] = [
+    "\033[48;5;94m",
+    "\033[48;5;123m",
+    "\033[48;5;166m",
+    "\033[48;5;57m",
+    "\033[48;5;200m",
+    "\033[48;5;106m",
+]
 RESET: str = "\033[0m"
 TEXT_BOLD_ITALIC_STATE: str = "\033[1m\033[3m" 
 PIN_TERMINATOR: str = "\033[22m\033[23m\033[49m"
@@ -921,13 +929,34 @@ def process_and_output_charts(data_file: str, state_file_bases: List[str]) -> No
                 printable_single_groups.append(remaining)
 
     if printable_single_groups:
-        p_group_line.append(f"{ISOLATED_LABEL_COLOR}Shorted P-groups:{RESET}")
+        LABEL = "Shorted groups:"
+        p_group_line.append(f"{ISOLATED_LABEL_COLOR}{LABEL}{RESET}")
+        color_index = 0
+        used_colors: Set[str] = set()
+        palette = GROUP_SUMMARY_COLORS if GROUP_SUMMARY_COLORS else COLORS
+        palette_len = len(palette)
+
         for group in printable_single_groups:
-            p_group_line.append(f" {ISOLATED_LABEL_COLOR}Group:{RESET}")
+            loop_count = 0
+            while True:
+                candidate = palette[color_index % palette_len]
+                color_index += 1
+                loop_count += 1
+                if candidate not in used_colors and candidate not in external_color_map_part3.values():
+                    highlight_color = candidate
+                    used_colors.add(candidate)
+                    break
+                if loop_count > palette_len:
+                    highlight_color = candidate
+                    used_colors.add(candidate)
+                    break
+
+            p_group_line.append("\nGroup:")
             for item in group:
-                p_group_line.append(f" {ISOLATED_PIN_COLOR}( {item} ){RESET}")
+                p_group_line.append(f" {highlight_color}( {item} ){RESET}")
     else:
-        p_group_line.append(f"{ISOLATED_LABEL_COLOR}Shorted P-groups:{RESET} none")
+        LABEL = "Shorted groups:"
+        p_group_line.append(f"{ISOLATED_LABEL_COLOR}{LABEL}{RESET} none")
 
     print("".join(p_group_line))
 
