@@ -1,29 +1,37 @@
-#series/parallel switcher A for pickup switcher position middle
-r
+
+
+#pickup 1 coil 1 polarity l2: normal / r2: reverse
+C1P: l2
+
+#pickup 1 coil 2 polarity l2: normal / r2: reverse
+C2P: l2
+
+#pickup 1 r: parallel or 2 / l: series or 1
+P1PS: r
+
+#pickup 1 l: humbucker / r: single
+P1SH: r
+
+
+
+
+#pickup 2 coil 1 polarity l2: normal / r2: reverse
+C3P: l2
+
+#pickup 2 coil 2 polarity l2: normal / r2: reverse
+C4P: l2
+
+#pickup 2 r: parallel or 4 / l: series or 3
+P2PS: r
+
+#pickup 2 l: humbucker / r: single
+P2SH: r
+
+
+
+
+#series/parallel switcher A for pickup switcher position middle l: parallel / r: series
+A: r
 
 #3-position pickup switcher l: pickup 1 / r: pickup 2
-m
-
-#
-l2
-
-#
-l2
-
-#
-l2
-
-#
-l2
-
-#
-l
-
-#
-l
-
-#
-r
-
-#
-l
+B: l

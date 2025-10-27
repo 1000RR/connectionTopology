@@ -499,6 +499,20 @@ def normalize_state_base(name: str) -> str:
         cleaned = cleaned[:-4]
     return cleaned
 
+def parse_state_entry(raw_entry: str) -> Tuple[Optional[str], str]:
+    """
+    Parse a state entry which may optionally specify a prefix (e.g., 'A:l').
+    Returns a tuple of (prefix or None, normalized_base).
+    """
+    entry = raw_entry.strip()
+    if not entry:
+        return None, ""
+    if ':' in entry:
+        prefix_part, base_part = entry.split(':', 1)
+        prefix = prefix_part.strip().upper()
+        return prefix if prefix else None, normalize_state_base(base_part)
+    return None, normalize_state_base(entry)
+
 # --- Main Logic ---
 
 def process_and_output_charts(data_file: str, state_file_bases: List[str]) -> None:
@@ -834,10 +848,11 @@ def process_and_output_charts(data_file: str, state_file_bases: List[str]) -> No
     print("==================================================================")
     
     e2e_shorts_map: Dict[str, Dict[str, str]] = {pin: {} for pin in E2E_PINS}
-    isolated_p_groups: List[Set[str]] = []
+    single_use_groups: List[Set[str]] = []
+    reported_e2e_targets: Set[str] = set()
     
     def has_single_occurrence(item: str) -> bool:
-        return external_occurrence_counts.get(item.upper(), 0) <= 1
+        return external_occurrence_counts.get(item.upper(), 0) == 1
     
     for group in globally_reduced_groups:
         group_set = set(group)
@@ -851,10 +866,9 @@ def process_and_output_charts(data_file: str, state_file_bases: List[str]) -> No
             item for item in all_non_pin_items_full
             if item not in E2E_PINS and has_single_occurrence(item)
         }
-        
-        # 2. Separate P-elements for the isolated P-group check
-        p_elements_in_group = {item for item in all_non_pin_items_full if is_p_element(item)}
-        
+        if single_occurrence_targets:
+            single_use_groups.append(set(single_occurrence_targets))
+
         present_e2e_pins = [pin for pin in E2E_PINS if pin in group_set]
 
         # --- E2E Shorting Check ---
@@ -871,17 +885,7 @@ def process_and_output_charts(data_file: str, state_file_bases: List[str]) -> No
                             # Other E2E pins might not, so default to NEUTRAL_BACKGROUND.
                             color = external_color_map_part3.get(item, NEUTRAL_BACKGROUND)
                             e2e_shorts_map[e2e_pin][item] = color
-
-        # --- Isolated P-Group Check ---
-        # The group is an isolated P-group if all non-pin items are P-elements
-        # AND there are no E2E pins in the group
-        is_isolated_p_group = (
-            len(p_elements_in_group) == len(all_non_pin_items_full) and 
-            not present_e2e_pins
-        )
-        
-        if is_isolated_p_group and len(p_elements_in_group) > 1:
-            isolated_p_groups.append(p_elements_in_group)
+                            reported_e2e_targets.add(item)
 
     # --- Print E2E shorts ---
     for e2e_pin in E2E_PINS:
@@ -899,34 +903,29 @@ def process_and_output_charts(data_file: str, state_file_bases: List[str]) -> No
         else:
             print(f"{e2e_pin} is shorted to: nothing")
 
-    # --- Print Isolated P-Groups ---
-    p_group_line = []
-    
-    printable_isolated_groups = []
-    
-    # Check if P-groups are truly isolated from E2E pins
-    all_e2e_targets = set()
-    for target_map in e2e_shorts_map.values():
-        all_e2e_targets.update(target_map.keys())
-        
-    for group in isolated_p_groups:
-        # Check if the P-group is shorted to any E2E pin directly
-        is_truly_isolated = True
-        for item in group:
-            if item in all_e2e_targets:
-                is_truly_isolated = False
-                break
-        
-        if is_truly_isolated:
-            printable_isolated_groups.append(sorted(list(group), key=str.upper))
-            
-    if printable_isolated_groups:
+    # --- Print single-occurrence groups not already reported above ---
+    p_group_line: List[str] = []
+    all_e2e_targets = set(reported_e2e_targets)
+    printable_single_groups: List[List[str]] = []
+    seen_groups: Set[Tuple[str, ...]] = set()
+
+    for group in single_use_groups:
+        remaining = sorted(
+            item for item in group
+            if item not in all_e2e_targets and item not in E2E_PINS
+        )
+        if len(remaining) > 1:
+            key = tuple(remaining)
+            if key not in seen_groups:
+                seen_groups.add(key)
+                printable_single_groups.append(remaining)
+
+    if printable_single_groups:
         p_group_line.append(f"{ISOLATED_LABEL_COLOR}Shorted P-groups:{RESET}")
-        for group in printable_isolated_groups:
+        for group in printable_single_groups:
             p_group_line.append(f" {ISOLATED_LABEL_COLOR}Group:{RESET}")
             for item in group:
                 p_group_line.append(f" {ISOLATED_PIN_COLOR}( {item} ){RESET}")
-        
     else:
         p_group_line.append(f"{ISOLATED_LABEL_COLOR}Shorted P-groups:{RESET} none")
 
@@ -948,8 +947,8 @@ if __name__ == '__main__':
         
     expected_args = len(GRID_PREFIXES_FINAL)
     
-    # All arguments after the script name are the state file bases
-    state_file_bases: List[str] = []
+    # All arguments after the script name provide state file information
+    raw_state_entries: List[Tuple[Optional[str], str]] = []
     received_args = 0
 
     if len(sys.argv) == 1:
@@ -966,7 +965,10 @@ if __name__ == '__main__':
                         continue
                     if line.startswith('#'):
                         continue
-                    state_file_bases.append(normalize_state_base(line))
+                    prefix, base = parse_state_entry(line)
+                    if not base:
+                        continue
+                    raw_state_entries.append((prefix, base))
         except FileNotFoundError:
             print(f"\nERROR: State file list '{list_file_path}' not found.")
             sys.exit(1)
@@ -974,7 +976,42 @@ if __name__ == '__main__':
             print(f"\nERROR: Unable to read state file list '{list_file_path}': {exc}")
             sys.exit(1)
     else:
-        state_file_bases = [normalize_state_base(arg) for arg in sys.argv[1:]]
+        for arg in sys.argv[1:]:
+            prefix, base = parse_state_entry(arg)
+            if not base:
+                continue
+            raw_state_entries.append((prefix, base))
+
+    if not raw_state_entries:
+        print("\nERROR: No valid state file entries provided.")
+        sys.exit(1)
+
+    has_prefixed_entries = any(prefix is not None for prefix, _ in raw_state_entries)
+    if has_prefixed_entries and any(prefix is None for prefix, _ in raw_state_entries):
+        print("\nERROR: Mixing prefixed and positional state entries is not supported. Please choose one approach.")
+        sys.exit(1)
+
+    if has_prefixed_entries:
+        prefix_map: Dict[str, str] = {}
+        for prefix, base in raw_state_entries:
+            assert prefix is not None  # for type checkers
+            if prefix not in GRID_PREFIXES_FINAL:
+                print(f"\nERROR: State entry references unknown grid prefix '{prefix}'.")
+                sys.exit(1)
+            if prefix in prefix_map:
+                print(f"\nERROR: Duplicate state entry provided for prefix '{prefix}'.")
+                sys.exit(1)
+            prefix_map[prefix] = base
+
+        missing_prefixes = [p for p in GRID_PREFIXES_FINAL if p not in prefix_map]
+        if missing_prefixes:
+            print("\nERROR: Missing state entries for the following prefixes:")
+            print(", ".join(missing_prefixes))
+            sys.exit(1)
+
+        state_file_bases = [prefix_map[prefix] for prefix in GRID_PREFIXES_FINAL]
+    else:
+        state_file_bases = [base for _, base in raw_state_entries]
 
     received_args = len(state_file_bases)
     
@@ -1000,6 +1037,7 @@ if __name__ == '__main__':
                  example_command = [f"<base_for_{p}>" for p in GRID_PREFIXES_FINAL]
                  print(f"\nUsage: python {script_name} {' '.join(example_command)}")
                  print(f"Example: python {script_name} {' '.join(example_bases)}")
+                 print("\nTip: you can also supply a list file with lines like 'PREFIX:state_base' to reorder mappings.")
             else:
                  print("\nNo grids were defined in data.csv (e.g., A:3x4). Please add definitions.")
                  
