@@ -18,7 +18,7 @@ For the case of
 A:3x4
 B:4x8
 
-The correct way to execute is python switchTopology.py left right
+The correct way to execute is ```python switchTopology.py left right```
 
 where left.csv:
 #DPDT switch set to left
