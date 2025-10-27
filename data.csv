@@ -1,8 +1,36 @@
-#this is the switches in COLSxROWS format
 A:3x4
 B:3x4
 
+P:2x3
+R:2x3
+S:2x3
+T:2x3
+
+
 e2epins:GND,TIP
+
+C1B+,P3
+C1B-,P4
+P1,P6,OUTC1B-
+P5,P2,OUTC1B+
+
+C2B+,R3
+C2B-,R4
+R1,R6,OUTC2B-
+R5,R2,OUTC2B+
+
+C3B+,S3
+C3B-,S4
+S1,S6,OUTC3B-
+S5,S2,OUTC3B+
+
+C4B+,T3
+C4B-,T4
+T1,T6,OUTC4B-
+T5,T2,OUTC4B+
+
+
+
 
 #THESE ARE THE PIN CONNECTION TUPLES, CAN CONNECT ACROSS MULTIPLE DEVICES, LIKE A1, B4, T
 #series/parallel switcher A for pickup switcher position middle

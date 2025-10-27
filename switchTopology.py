@@ -576,31 +576,18 @@ def process_and_output_charts(data_file: str, state_file_bases: List[str]) -> No
     for prefix in GRID_PREFIXES:
         apply_coloring(final_lines_part2[prefix], ops_by_prefix_part2[prefix])
 
-    final_external_cells_part2: List[str] = []
-    # Include E2E pins in the external item list for display
+    # Prepare external items for horizontal table below
     all_external_items_part2 = all_unique_external_items_part2.union(set(E2E_PINS))
-    filtered_external_items_part2 = sorted([item for item in all_external_items_part2 if not is_grid_definition(item) and not is_e2e_pin_definition(item)], key=str.upper)
-    
-    border_line: str = "+" + "-" * cell_width + "+"
     NEUTRAL_COLOR: str = "\033[40m"
-    final_external_cells_part2.append(NEUTRAL_COLOR + border_line + RESET)
-    final_external_cells_part2.append(NEUTRAL_COLOR + "|  EXTERNAL  |" + RESET)
-    final_external_cells_part2.append(NEUTRAL_COLOR + border_line + RESET)
+    # Sort by color first, then alphabetically within each color
+    filtered_external_items_part2 = sorted(
+        [item for item in all_external_items_part2 if not is_grid_definition(item) and not is_e2e_pin_definition(item)],
+        key=lambda x: (external_color_map_part2.get(x, NEUTRAL_COLOR), x.upper())
+    )
     
-    for item in filtered_external_items_part2: 
-        color: str = external_color_map_part2.get(item, NEUTRAL_COLOR)
-        final_external_cells_part2.append(color + "|" + item.center(cell_width) + "|" + RESET)
-    
-    final_external_cells_part2.append(NEUTRAL_COLOR + border_line + RESET)
-
-
     header_str = GRID_SEPARATOR.join([f"SWITCH {p}" for p in GRID_PREFIXES])
     
-    pad_cell_width = len(final_external_cells_part2[0]) if final_external_cells_part2 else 0
-    blank_pad_line = " " * (pad_cell_width)
-    final_external_padded_part2: List[str] = final_external_cells_part2 + [blank_pad_line] * (grid_height - len(final_external_cells_part2))
-    
-    print(f"\n{header_str:<{grid_width_total}}{GRID_SEPARATOR}ALL EXTERNAL CONNECTIONS (Colored)")
+    print(f"\n{header_str}")
     print("Note: Bold and italic text indicates pin is active per state file.")
     for i in range(grid_height):
         line_parts = []
@@ -610,8 +597,32 @@ def process_and_output_charts(data_file: str, state_file_bases: List[str]) -> No
             pad_space = " " * (max_grid_width - len(current_lines[0]))
             line_parts.append(current_lines[i] + pad_space)
             
-        output_line = GRID_SEPARATOR.join(line_parts) + GRID_SEPARATOR + final_external_padded_part2[i]
+        output_line = GRID_SEPARATOR.join(line_parts)
         print(output_line)
+    
+    # Print horizontal external pins table below
+    if filtered_external_items_part2:
+        print("\nALL EXTERNAL CONNECTIONS (Colored):")
+        NEUTRAL_COLOR: str = "\033[40m"
+        num_items = len(filtered_external_items_part2)
+        border_line: str = "+" + ("+" + "-" * cell_width) * num_items + "+"
+        
+        print(NEUTRAL_COLOR + border_line + RESET)
+        
+        # Header row - single centered "EXTERNAL"
+        total_width = num_items * (cell_width + 1)
+        header_row = NEUTRAL_COLOR + "|" + "EXTERNAL".center(total_width) + "|" + RESET
+        print(header_row)
+        print(NEUTRAL_COLOR + border_line + RESET)
+        
+        # Item row
+        item_row = NEUTRAL_COLOR + "|" + RESET
+        for item in filtered_external_items_part2:
+            color: str = external_color_map_part2.get(item, NEUTRAL_COLOR)
+            item_row += color + item.center(cell_width) + "|" + RESET
+        print(item_row)
+        print(NEUTRAL_COLOR + border_line + RESET)
+    
     print("\n" + "=" * 80)
 
     # 9. PART 2.5: Output State Interconnection Chart
@@ -684,33 +695,19 @@ def process_and_output_charts(data_file: str, state_file_bases: List[str]) -> No
         for prefix in GRID_PREFIXES:
             apply_coloring(final_lines_part2_5[prefix], ops_by_prefix_part2_5[prefix])
 
-        # 4. Generate External Cells (Same as Part 3)
-        final_external_cells_part2_5: List[str] = []
+        # 4. Prepare external items for horizontal table below
         all_external_items_part2_5 = all_unique_external_items_part2_5.union(set(E2E_PINS))
-        filtered_external_items_part2_5 = sorted([item for item in all_external_items_part2_5 if not is_grid_definition(item) and not is_e2e_pin_definition(item)], key=str.upper)
-
-        border_line: str = "+" + "-" * cell_width + "+"
         NEUTRAL_COLOR: str = "\033[40m"
-        final_external_cells_part2_5.append(NEUTRAL_COLOR + border_line + RESET)
-        final_external_cells_part2_5.append(NEUTRAL_COLOR + "|  EXTERNAL  |" + RESET)
-        final_external_cells_part2_5.append(NEUTRAL_COLOR + border_line + RESET)
-        
-        for item in filtered_external_items_part2_5: 
-            # Use the state-only color map
-            color: str = external_color_map_part2_5.get(item, NEUTRAL_COLOR) 
-            final_external_cells_part2_5.append(color + "|" + item.center(cell_width) + "|" + RESET)
-        
-        final_external_cells_part2_5.append(NEUTRAL_COLOR + border_line + RESET)
+        # Sort by color first, then alphabetically within each color
+        filtered_external_items_part2_5 = sorted(
+            [item for item in all_external_items_part2_5 if not is_grid_definition(item) and not is_e2e_pin_definition(item)],
+            key=lambda x: (external_color_map_part2_5.get(x, NEUTRAL_COLOR), x.upper())
+        )
 
-        pad_cell_width = len(final_external_cells_part2_5[0]) if final_external_cells_part2_5 else 0
-        blank_pad_line = " " * (pad_cell_width)
-        final_external_padded_part2_5: List[str] = final_external_cells_part2_5 + [blank_pad_line] * (grid_height - len(final_external_cells_part2_5))
-        
         # 5. Output the Chart
         header_str = GRID_SEPARATOR.join([f"SWITCH {p}" for p in GRID_PREFIXES])
-        grid_width_total = max_C * (cell_width + 1) + 1 # Recalculate based on max_C for proper spacing
 
-        print(f"\n{header_str:<{grid_width_total}}{GRID_SEPARATOR}ALL EXTERNAL CONNECTIONS (Colored)")
+        print(f"\n{header_str}")
         print("Note: Colors represent state-active interconnections only. Bold and italic text indicates pin is active per state file.")
         for i in range(grid_height):
             line_parts = []
@@ -720,8 +717,32 @@ def process_and_output_charts(data_file: str, state_file_bases: List[str]) -> No
                 pad_space = " " * (max_grid_width - len(current_lines[0]))
                 line_parts.append(current_lines[i] + pad_space)
                 
-            output_line = GRID_SEPARATOR.join(line_parts) + GRID_SEPARATOR + final_external_padded_part2_5[i]
+            output_line = GRID_SEPARATOR.join(line_parts)
             print(output_line)
+        
+        # Print horizontal external pins table below
+        if filtered_external_items_part2_5:
+            print("\nALL EXTERNAL CONNECTIONS (Colored):")
+            NEUTRAL_COLOR: str = "\033[40m"
+            num_items = len(filtered_external_items_part2_5)
+            border_line: str = "+" + ("+" + "-" * cell_width) * num_items + "+"
+            
+            print(NEUTRAL_COLOR + border_line + RESET)
+            
+            # Header row - single centered "EXTERNAL"
+            total_width = num_items * (cell_width + 1)
+            header_row = NEUTRAL_COLOR + "|" + "EXTERNAL".center(total_width) + "|" + RESET
+            print(header_row)
+            print(NEUTRAL_COLOR + border_line + RESET)
+            
+            # Item row
+            item_row = NEUTRAL_COLOR + "|" + RESET
+            for item in filtered_external_items_part2_5:
+                # Use the state-only color map
+                color: str = external_color_map_part2_5.get(item, NEUTRAL_COLOR)
+                item_row += color + item.center(cell_width) + "|" + RESET
+            print(item_row)
+            print(NEUTRAL_COLOR + border_line + RESET)
 
     # 9. PART 3: Output Consolidated Chart (Based on GLOBAL reduction)
     print("\n\n" + "=" * 80)
@@ -737,26 +758,18 @@ def process_and_output_charts(data_file: str, state_file_bases: List[str]) -> No
     for prefix in GRID_PREFIXES:
         apply_coloring(final_lines_part3[prefix], ops_by_prefix_part3[prefix])
 
-    final_external_cells_part3: List[str] = []
-    # Include E2E pins in the external item list for display
+    # Prepare external items for horizontal table below
     all_external_items_part3 = all_unique_external_items_part3.union(set(E2E_PINS))
-    filtered_external_items_part3 = sorted([item for item in all_external_items_part3 if not is_grid_definition(item) and not is_e2e_pin_definition(item)], key=str.upper)
-
-    border_line: str = "+" + "-" * cell_width + "+"
     NEUTRAL_COLOR: str = "\033[40m"
-    final_external_cells_part3.append(NEUTRAL_COLOR + border_line + RESET)
-    final_external_cells_part3.append(NEUTRAL_COLOR + "|  EXTERNAL  |" + RESET)
-    final_external_cells_part3.append(NEUTRAL_COLOR + border_line + RESET)
-    
-    for item in filtered_external_items_part3: 
-        color: str = external_color_map_part3.get(item, NEUTRAL_COLOR)
-        final_external_cells_part3.append(color + "|" + item.center(cell_width) + "|" + RESET)
-    
-    final_external_cells_part3.append(NEUTRAL_COLOR + border_line + RESET)
+    # Sort by color first, then alphabetically within each color
+    filtered_external_items_part3 = sorted(
+        [item for item in all_external_items_part3 if not is_grid_definition(item) and not is_e2e_pin_definition(item)],
+        key=lambda x: (external_color_map_part3.get(x, NEUTRAL_COLOR), x.upper())
+    )
 
-    final_external_padded_part3: List[str] = final_external_cells_part3 + [blank_pad_line] * (grid_height - len(final_external_cells_part3))
+    header_str = GRID_SEPARATOR.join([f"SWITCH {p}" for p in GRID_PREFIXES])
     
-    print(f"\n{header_str:<{grid_width_total}}{GRID_SEPARATOR}ALL EXTERNAL CONNECTIONS (Colored)")
+    print(f"\n{header_str}")
     print("Note: Bold and italic text indicates pin is active per state file.")
     for i in range(grid_height):
         line_parts = []
@@ -766,8 +779,32 @@ def process_and_output_charts(data_file: str, state_file_bases: List[str]) -> No
             pad_space = " " * (max_grid_width - len(current_lines[0]))
             line_parts.append(current_lines[i] + pad_space)
             
-        output_line = GRID_SEPARATOR.join(line_parts) + GRID_SEPARATOR + final_external_padded_part3[i]
+        output_line = GRID_SEPARATOR.join(line_parts)
         print(output_line)
+    
+    # Print horizontal external pins table below
+    if filtered_external_items_part3:
+        print("\nALL EXTERNAL CONNECTIONS (Colored):")
+        NEUTRAL_COLOR: str = "\033[40m"
+        num_items = len(filtered_external_items_part3)
+        border_line: str = "+" + ("+" + "-" * cell_width) * num_items + "+"
+        
+        print(NEUTRAL_COLOR + border_line + RESET)
+        
+        # Header row - single centered "EXTERNAL"
+        total_width = num_items * (cell_width + 1)
+        header_row = NEUTRAL_COLOR + "|" + "EXTERNAL".center(total_width) + "|" + RESET
+        print(header_row)
+        print(NEUTRAL_COLOR + border_line + RESET)
+        
+        # Item row
+        item_row = NEUTRAL_COLOR + "|" + RESET
+        for item in filtered_external_items_part3:
+            color: str = external_color_map_part3.get(item, NEUTRAL_COLOR)
+            item_row += color + item.center(cell_width) + "|" + RESET
+        print(item_row)
+        print(NEUTRAL_COLOR + border_line + RESET)
+    
     print("\n" + "=" * 80)
 
 
