@@ -1,0 +1,11 @@
+# pickup states
+l
+r
+l2
+r2
+l
+r
+l
+r
+l
+r

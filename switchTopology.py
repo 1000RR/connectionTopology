@@ -492,6 +492,13 @@ def prepare_external_items(
         key=lambda x: (color_map.get(x, NEUTRAL_BACKGROUND), x.upper())
     )
 
+def normalize_state_base(name: str) -> str:
+    """Normalize a state file reference to its base name without .csv."""
+    cleaned = name.strip()
+    if cleaned.lower().endswith('.csv'):
+        cleaned = cleaned[:-4]
+    return cleaned
+
 # --- Main Logic ---
 
 def process_and_output_charts(data_file: str, state_file_bases: List[str]) -> None:
@@ -548,6 +555,19 @@ def process_and_output_charts(data_file: str, state_file_bases: List[str]) -> No
         file_path = f"{file_base}.csv"
         initial_state_groups.extend(load_state_data_as_groups(file_path, prefix))
         state_pins_by_prefix[prefix] = load_state_pin_set(file_path, prefix)
+
+    # Track how many times each external element appears in data.csv connections
+    external_occurrence_counts: Dict[str, int] = {}
+    for group in initial_data_groups:
+        for item in group:
+            normalized_item = item.upper()
+            if (
+                normalized_item
+                and normalized_item not in E2E_PINS
+                and not is_pin(normalized_item)
+                and not is_grid_definition(normalized_item)
+            ):
+                external_occurrence_counts[normalized_item] = external_occurrence_counts.get(normalized_item, 0) + 1
 
     # 4. PERFORM AND PRINT GLOBAL REDUCTION
     print("=" * 70)
@@ -816,17 +836,24 @@ def process_and_output_charts(data_file: str, state_file_bases: List[str]) -> No
     e2e_shorts_map: Dict[str, Dict[str, str]] = {pin: {} for pin in E2E_PINS}
     isolated_p_groups: List[Set[str]] = []
     
+    def has_single_occurrence(item: str) -> bool:
+        return external_occurrence_counts.get(item.upper(), 0) <= 1
+    
     for group in globally_reduced_groups:
         group_set = set(group)
         
         # 1. Identify ALL non-switch-pin items in the group (P-elements and E2E pins)
-        all_non_pin_items = {
+        all_non_pin_items_full = {
             item for item in group_set 
             if not is_pin(item) and not is_grid_definition(item)
         }
+        single_occurrence_targets = {
+            item for item in all_non_pin_items_full
+            if item not in E2E_PINS and has_single_occurrence(item)
+        }
         
         # 2. Separate P-elements for the isolated P-group check
-        p_elements_in_group = {item for item in all_non_pin_items if is_p_element(item)}
+        p_elements_in_group = {item for item in all_non_pin_items_full if is_p_element(item)}
         
         present_e2e_pins = [pin for pin in E2E_PINS if pin in group_set]
 
@@ -835,7 +862,7 @@ def process_and_output_charts(data_file: str, state_file_bases: List[str]) -> No
             for e2e_pin in present_e2e_pins:
                 
                 # Check for shorts to *any other* non-switch-pin item in the group
-                for item in all_non_pin_items:
+                for item in single_occurrence_targets:
                     
                     # CRITICAL FIX: Only report the short if the item is *not* the E2E pin itself.
                     if item != e2e_pin: 
@@ -849,7 +876,7 @@ def process_and_output_charts(data_file: str, state_file_bases: List[str]) -> No
         # The group is an isolated P-group if all non-pin items are P-elements
         # AND there are no E2E pins in the group
         is_isolated_p_group = (
-            len(p_elements_in_group) == len(all_non_pin_items) and 
+            len(p_elements_in_group) == len(all_non_pin_items_full) and 
             not present_e2e_pins
         )
         
@@ -922,7 +949,33 @@ if __name__ == '__main__':
     expected_args = len(GRID_PREFIXES_FINAL)
     
     # All arguments after the script name are the state file bases
-    state_file_bases = sys.argv[1:]
+    state_file_bases: List[str] = []
+    received_args = 0
+
+    if len(sys.argv) == 1:
+        print("\nERROR: No state file list provided. Supply a list file or state file bases.")
+        sys.exit(1)
+
+    if len(sys.argv) == 2:
+        list_file_path = sys.argv[1]
+        try:
+            with open(list_file_path, 'r', encoding='utf-8') as list_file:
+                for raw_line in list_file:
+                    line = raw_line.strip()
+                    if not line:
+                        continue
+                    if line.startswith('#'):
+                        continue
+                    state_file_bases.append(normalize_state_base(line))
+        except FileNotFoundError:
+            print(f"\nERROR: State file list '{list_file_path}' not found.")
+            sys.exit(1)
+        except Exception as exc:
+            print(f"\nERROR: Unable to read state file list '{list_file_path}': {exc}")
+            sys.exit(1)
+    else:
+        state_file_bases = [normalize_state_base(arg) for arg in sys.argv[1:]]
+
     received_args = len(state_file_bases)
     
     # 2. Check for parameter mismatch
