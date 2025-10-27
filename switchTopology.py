@@ -393,7 +393,7 @@ def render_external_connections_table(
     border_line: str = ("+" + "-" * cell_width) * num_items + "+"
     print(NEUTRAL_BACKGROUND + border_line + RESET)
 
-    total_width = num_items * (cell_width + 1)
+    total_width = num_items * (cell_width + 1) - 1
     header_row = NEUTRAL_BACKGROUND + "|" + label.center(total_width) + "|" + RESET
     print(header_row)
     print(NEUTRAL_BACKGROUND + border_line + RESET)
@@ -426,7 +426,6 @@ def build_colored_grid_lines(
 def render_switch_grids(
     final_lines: Dict[str, List[str]],
     grid_height: int,
-    max_grid_width: int,
     note_text: str
 ) -> None:
     """
@@ -440,8 +439,7 @@ def render_switch_grids(
         line_parts = []
         for prefix in GRID_PREFIXES:
             current_lines = final_lines[prefix]
-            pad_space = " " * (max_grid_width - len(current_lines[0]))
-            line_parts.append(current_lines[i] + pad_space)
+            line_parts.append(current_lines[i])
 
         output_line = GRID_SEPARATOR.join(line_parts)
         print(output_line)
@@ -503,8 +501,11 @@ def process_and_output_charts(data_file: str, state_file_bases: List[str]) -> No
          
     grid_height = len(grid_lines[GRID_PREFIXES[0]]) 
     
-    # Calculate the max width a grid could occupy (needed for padding grids with smaller C)
-    max_grid_width = max_C * (cell_width + 1) + 1 
+    grid_line_widths: Dict[str, int] = {
+        prefix: len(grid_lines[prefix][0]) if grid_lines[prefix] else 0
+        for prefix in GRID_PREFIXES
+    }
+    grid_section_width = sum(grid_line_widths.values()) + ((len(GRID_PREFIXES) - 1) * len(GRID_SEPARATOR))
     
     # 3. LOAD ALL DATA SOURCES (Connections and States)
     initial_data_groups = load_data(data_file)
@@ -561,9 +562,10 @@ def process_and_output_charts(data_file: str, state_file_bases: List[str]) -> No
 
     color_index: int = 0
     
-    # Calculate the total width of all grids plus their separators
+    # Prepare header template for individual charts
     num_grids = len(GRID_PREFIXES)
-    grid_width_total = (num_grids * max_grid_width) + ((num_grids - 1) * len(GRID_SEPARATOR))
+    header_parts = [f"GROUP {p}" for p in GRID_PREFIXES]
+    header_str_template = GRID_SEPARATOR.join(header_parts)
     
     for line_data in charting_groups_part1:
         
@@ -620,17 +622,11 @@ def process_and_output_charts(data_file: str, state_file_bases: List[str]) -> No
         
         # --- Output Current Individual Chart ---
         colored_lines_by_prefix: Dict[str, List[str]] = {}
-        header_str = ""
         
         for prefix in GRID_PREFIXES:
             colored_lines = list(grid_lines[prefix])
             apply_coloring(colored_lines, color_ops_by_prefix[prefix])
-            
-            # Pad lines to max_grid_width for alignment
-            pad_space = " " * (max_grid_width - len(colored_lines[0]))
-            colored_lines_by_prefix[prefix] = [line + pad_space for line in colored_lines]
-
-            header_str += f"GROUP {prefix}" + (f"{GRID_SEPARATOR}" if prefix != GRID_PREFIXES[-1] else "")
+            colored_lines_by_prefix[prefix] = colored_lines
 
 
         pad_cell_width = len(standalone_cells[0]) if standalone_cells else (cell_width + 2) 
@@ -639,9 +635,9 @@ def process_and_output_charts(data_file: str, state_file_bases: List[str]) -> No
         standalone_padded: List[str] = standalone_cells + [blank_pad_line] * (grid_height - len(standalone_cells))
         
         # Print Group Header and Separator
-        print(f"\n{'-' * (grid_width_total + len(GRID_SEPARATOR) + pad_cell_width)}")
+        print(f"\n{'-' * (grid_section_width + len(GRID_SEPARATOR) + pad_cell_width)}")
         print(f"Group: {line_string} {color}(COLOR){RESET} (Bold/Italic text = State Active)")
-        print(f"{header_str:<{grid_width_total}}{GRID_SEPARATOR}EXTERNAL")
+        print(f"{header_str_template.ljust(grid_section_width)}{GRID_SEPARATOR}EXTERNAL")
         
         # Print Rows
         for i in range(grid_height):
@@ -663,7 +659,6 @@ def process_and_output_charts(data_file: str, state_file_bases: List[str]) -> No
     render_switch_grids(
         final_lines_part2,
         grid_height,
-        max_grid_width,
         "Note: Bold and italic text indicates pin is active per state file."
     )
 
@@ -742,7 +737,6 @@ def process_and_output_charts(data_file: str, state_file_bases: List[str]) -> No
         render_switch_grids(
             final_lines_part2_5,
             grid_height,
-            max_grid_width,
             "Note: Colors represent state-active interconnections only. Bold and italic text indicates pin is active per state file."
         )
         
@@ -763,7 +757,6 @@ def process_and_output_charts(data_file: str, state_file_bases: List[str]) -> No
     render_switch_grids(
         final_lines_part3,
         grid_height,
-        max_grid_width,
         "Note: Bold and italic text indicates pin is active per state file."
     )
     
