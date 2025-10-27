@@ -375,6 +375,39 @@ def calculate_global_colors(globally_reduced_groups: List[List[str]], map_coords
             
     return pin_color_map, external_color_map, consolidated_pin_ops, all_unique_external_items
 
+# --- Output Helpers ---
+
+def render_external_connections_table(
+    items: List[str],
+    color_map: Dict[str, str],
+    cell_width: int,
+    label: str = "EXTERNAL"
+) -> None:
+    """
+    Render a single-row table describing the external connections using the provided colors.
+    """
+    if not items:
+        return
+
+    neutral_color: str = "\033[40m"
+    print("\nALL EXTERNAL CONNECTIONS (Colored):")
+
+    num_items = len(items)
+    border_line: str = ("+" + "-" * cell_width) * num_items + "+"
+    print(neutral_color + border_line + RESET)
+
+    total_width = num_items * (cell_width + 1)
+    header_row = neutral_color + "|" + label.center(total_width) + "|" + RESET
+    print(header_row)
+    print(neutral_color + border_line + RESET)
+
+    item_row = neutral_color + "|" + RESET
+    for item in items:
+        color: str = color_map.get(item, neutral_color)
+        item_row += color + item.center(cell_width) + "|" + RESET
+    print(item_row)
+    print(neutral_color + border_line + RESET)
+
 # --- Main Logic ---
 
 def process_and_output_charts(data_file: str, state_file_bases: List[str]) -> None:
@@ -601,27 +634,7 @@ def process_and_output_charts(data_file: str, state_file_bases: List[str]) -> No
         print(output_line)
     
     # Print horizontal external pins table below
-    if filtered_external_items_part2:
-        print("\nALL EXTERNAL CONNECTIONS (Colored):")
-        NEUTRAL_COLOR: str = "\033[40m"
-        num_items = len(filtered_external_items_part2)
-        border_line: str = "+" + ("+" + "-" * cell_width) * num_items + "+"
-        
-        print(NEUTRAL_COLOR + border_line + RESET)
-        
-        # Header row - single centered "EXTERNAL"
-        total_width = num_items * (cell_width + 1)
-        header_row = NEUTRAL_COLOR + "|" + "EXTERNAL".center(total_width) + "|" + RESET
-        print(header_row)
-        print(NEUTRAL_COLOR + border_line + RESET)
-        
-        # Item row
-        item_row = NEUTRAL_COLOR + "|" + RESET
-        for item in filtered_external_items_part2:
-            color: str = external_color_map_part2.get(item, NEUTRAL_COLOR)
-            item_row += color + item.center(cell_width) + "|" + RESET
-        print(item_row)
-        print(NEUTRAL_COLOR + border_line + RESET)
+    render_external_connections_table(filtered_external_items_part2, external_color_map_part2, cell_width)
     
     print("\n" + "=" * 80)
 
@@ -721,28 +734,7 @@ def process_and_output_charts(data_file: str, state_file_bases: List[str]) -> No
             print(output_line)
         
         # Print horizontal external pins table below
-        if filtered_external_items_part2_5:
-            print("\nALL EXTERNAL CONNECTIONS (Colored):")
-            NEUTRAL_COLOR: str = "\033[40m"
-            num_items = len(filtered_external_items_part2_5)
-            border_line: str = "+" + ("+" + "-" * cell_width) * num_items + "+"
-            
-            print(NEUTRAL_COLOR + border_line + RESET)
-            
-            # Header row - single centered "EXTERNAL"
-            total_width = num_items * (cell_width + 1)
-            header_row = NEUTRAL_COLOR + "|" + "EXTERNAL".center(total_width) + "|" + RESET
-            print(header_row)
-            print(NEUTRAL_COLOR + border_line + RESET)
-            
-            # Item row
-            item_row = NEUTRAL_COLOR + "|" + RESET
-            for item in filtered_external_items_part2_5:
-                # Use the state-only color map
-                color: str = external_color_map_part2_5.get(item, NEUTRAL_COLOR)
-                item_row += color + item.center(cell_width) + "|" + RESET
-            print(item_row)
-            print(NEUTRAL_COLOR + border_line + RESET)
+        render_external_connections_table(filtered_external_items_part2_5, external_color_map_part2_5, cell_width)
 
     # 9. PART 3: Output Consolidated Chart (Based on GLOBAL reduction)
     print("\n\n" + "=" * 80)
@@ -783,27 +775,7 @@ def process_and_output_charts(data_file: str, state_file_bases: List[str]) -> No
         print(output_line)
     
     # Print horizontal external pins table below
-    if filtered_external_items_part3:
-        print("\nALL EXTERNAL CONNECTIONS (Colored):")
-        NEUTRAL_COLOR: str = "\033[40m"
-        num_items = len(filtered_external_items_part3)
-        border_line: str = "+" + ("+" + "-" * cell_width) * num_items + "+"
-        
-        print(NEUTRAL_COLOR + border_line + RESET)
-        
-        # Header row - single centered "EXTERNAL"
-        total_width = num_items * (cell_width + 1)
-        header_row = NEUTRAL_COLOR + "|" + "EXTERNAL".center(total_width) + "|" + RESET
-        print(header_row)
-        print(NEUTRAL_COLOR + border_line + RESET)
-        
-        # Item row
-        item_row = NEUTRAL_COLOR + "|" + RESET
-        for item in filtered_external_items_part3:
-            color: str = external_color_map_part3.get(item, NEUTRAL_COLOR)
-            item_row += color + item.center(cell_width) + "|" + RESET
-        print(item_row)
-        print(NEUTRAL_COLOR + border_line + RESET)
+    render_external_connections_table(filtered_external_items_part3, external_color_map_part3, cell_width)
     
     print("\n" + "=" * 80)
 
