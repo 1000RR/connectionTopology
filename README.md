@@ -4,10 +4,25 @@
 
 ### data.csv:
 Contains:
-- any number of <STRING/CHAR>:<COLS>x<ROWS> - definition of a pinout surface, like a switch. numbering begins at the top left with pin 1, and goes right, then wraps until pin COLS*ROWS
-- 1 of e2epins:<name-of-pin>,<name-of-pin-2>..... - pins to show in the end to end topology
-- tuples of pins of <STRING><NUMBER>, or more generically, <pin-name>
-- comment lines starting with the # char
+  - any number of <STRING/CHAR>:<COLS>x<ROWS> - definition of a pinout surface, like a switch. numbering begins at the top left with pin 1, and goes right, then wraps until pin COLS*ROWS
+  - 1 of e2epins:<name-of-pin>,<name-of-pin-2>..... - pins to show in the end to end topology
+  - tuples of pins of <STRING><NUMBER>, or more generically, <pin-name>
+  - comment lines starting with the # char
+
+  Example:
+  ```
+  A:3x4
+  B:3x4
+  
+  e2epins:GND,TIP
+  
+  #THESE ARE THE PIN CONNECTION TUPLES, CAN CONNECT ACROSS MULTIPLE DEVICES, LIKE A1, B4, T
+  #series/parallel switcher A for pickup switcher position middle
+  #pickup switcher B
+  TIP,B5,B8,B11
+  GND,A4,A10,B2
+  P1+,A2
+  ```
 
 ### Interconnection State Files (.csv)
 that contain k n-tuples of numbers in the following format, tuple per line: <number>, <number2>, <number3>,...
